@@ -1,3 +1,4 @@
+
 --ircbot.hs
 
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, GeneralizedNewtypeDeriving, RankNTypes, RecordWildCards #-}
@@ -96,12 +97,13 @@ getBotConf mLogger =
             putStr (helpMessage progName)
             exitFailure
 
-getFeedConf :: IO (String, Int)
+getFeedConf :: IO (String, String, Int)
 getFeedConf = do
   args <- getArgs
   let url = fromJust $ getParam "--feed-url" args
+      channel = fromJust $ getParam "--channel" args
       span = read . fromJust $ getParam "--feed-span" args
-  return (url, span)
+  return (url, channel, span)
 
 getParam :: String -> [String] -> Maybe String
 getParam _ [] = Nothing
@@ -132,9 +134,9 @@ helpMessage progName = usageInfo header botOpts
 main :: IO ()
 main =
   do botConf <- getBotConf Nothing
-     (url, span) <- getFeedConf
+     (url, channel, span) <- getFeedConf
      ircParts <- initParts (channels botConf)
-     let feedParts = [feedPart "#haskell" (6 * 1000 * 1000)]
+     let feedParts = [feedPart url channel (span * 1000 * 1000)]
      (tids, _) <- timerBot botConf ircParts feedParts
 --     (tids, reconnect) <- simpleBot botConf ircParts
 --     (logger botConf) Important  "Press enter to force reconnect."
@@ -156,7 +158,7 @@ initParts chans =
             , channelsPart
             , dicePart
             , helloPart
-            , logPart . head . toList $ chans
+--            , logPart . head . toList $ chans
             ]
 
 showBotConf :: BotConf -> String
@@ -206,10 +208,11 @@ getLocalCurrentTimeString format =
      return formatted
 
 
-feedPart :: BotMonad m => String -> Int -> m ()
-feedPart channel wait =
-  do time <- liftIO $ getLocalCurrentTimeString "%F %X feedLoop"
-     liftIO $ putStrLn $ time
-     sendMessage $ privmsg channel time
+feedPart :: BotMonad m => String -> String -> Int -> m ()
+feedPart url channel wait =
+  do time <- liftIO $ getLocalCurrentTimeString "%F %X feed "
+     let msg = time ++ url
+     liftIO $ putStrLn $ msg
+     sendMessage $ privmsg channel msg
      liftIO $ threadDelay wait
      return ()
