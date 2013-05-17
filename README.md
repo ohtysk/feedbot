@@ -3,6 +3,13 @@ feedbot
 
 Feed IRC bot by Haskell
 
+Require
+----
+ * ghc 7.4.2
+ * cabal-install 1.16.0.2
+ * irc 0.5.1.0
+ * ircbot 0.5.3
+
 Usage
 ----
 
