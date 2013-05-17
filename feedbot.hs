@@ -33,6 +33,7 @@ import System.Exit                (exitFailure)
 import System.Cmd                 (system)
 import System.Locale              (defaultTimeLocale)
 --import System.IO                  (stdout)
+import Data.Maybe                 (fromJust)
 
 data Flag
     = BotConfOpt { unBotConfOpt :: (BotConf -> BotConf) }
@@ -49,6 +50,8 @@ botOpts =
   , Option [] ["channel"]    (ReqArg addChannel   "channel name")   "channel to join after connecting. (can be specified more than once to join multiple channels)"
   , Option [] ["log-level"]  (ReqArg setLogLevel  "debug, normal, important, quiet") "set the logging level"
   , Option [] ["limit"]      (ReqArg setLimit     "int,int")        "enable rate limiter. burst length, delay in microseconds"
+  , Option [] ["feed-url"]   (ReqArg setNone      "hoge")           "huga"
+  , Option [] ["feed-span"]  (ReqArg setNone      "iiii")           "jjjj"
   ]
   where
     setIrcServer n = BotConfOpt $ \c -> c { host = n, user = (user c) { servername = n } }
@@ -77,6 +80,7 @@ botOpts =
                   c { limits = Just (burstLen, delay) }
                 _ -> error $ "unabled to parse delay: " ++ delayStr
             _ -> error $ "unabled to parse burst length: " ++ burstStr
+    setNone _ = BotConfOpt $ \c -> c
 
 getBotConf :: Maybe (Chan Message -> IO ()) -> IO BotConf
 getBotConf mLogger =
@@ -95,7 +99,14 @@ getBotConf mLogger =
 getFeedConf :: IO (String, Int)
 getFeedConf = do
   args <- getArgs
-  return ("hoge", 10)
+  let url = fromJust $ getParam "--feed-url" args
+      span = read . fromJust $ getParam "--feed-span" args
+  return (url, span)
+
+getParam :: String -> [String] -> Maybe String
+getParam _ [] = Nothing
+getParam _ [x] = Nothing
+getParam key xs = Just . head $ drop 1  $ dropWhile (/= key) xs
 
 
 exitHelp msg =
@@ -121,6 +132,7 @@ helpMessage progName = usageInfo header botOpts
 main :: IO ()
 main =
   do botConf <- getBotConf Nothing
+     (url, span) <- getFeedConf
      ircParts <- initParts (channels botConf)
      let feedParts = [feedPart "#haskell" (6 * 1000 * 1000)]
      (tids, _) <- timerBot botConf ircParts feedParts
