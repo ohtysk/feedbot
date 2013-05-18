@@ -132,8 +132,10 @@ main =
   do botConf <- getBotConf Nothing
      (url, channel, span) <- getFeedConf
      ircParts <- initParts (channels botConf)
-     let file = "tmpfile"
-     let feedParts = [(feedPart file url channel, span * 1000 * 1000)]
+     let server = host botConf
+         nic = nick botConf
+         file = concat [server, channel, nic, slashEscape url, show span]
+         feedParts = [(feedPart file url channel, span * 1000 * 1000)]
      (tids, _) <- timerBot botConf ircParts feedParts
      (logger botConf) Important  "Press enter to quit."
      getLine
@@ -209,9 +211,9 @@ feedPart file url channel =
                    msg = title ++ "(" ++ author ++ ") " ++ link
                sendMessage $ privmsg channel msg
                return ()
-              ) $ take 10 (reverse news)
+              ) $ reverse $ take 10 news
      liftIO $ saveUpdated file news
-     liftIO $ putStrLn "hoge"
      return ()
 
-
+slashEscape :: String -> String
+slashEscape str = filter (/= '/') str
