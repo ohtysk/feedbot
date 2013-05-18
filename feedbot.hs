@@ -21,10 +21,9 @@ import Network.IRC                (Message)
 import Network.IRC.Commands       (privmsg)
 import Network.IRC.Bot.BotMonad   (BotMonad(..))
 --import Network.IRC.Bot.Core       (BotConf(..), User(..), nullBotConf, simpleBot)
-import TimerBot                       (BotConf(..), User(..), nullBotConf, simpleBot, timerBot)
 import Network.IRC.Bot.Log        (LogLevel(..), nullLogger, stdoutLogger)
 import Network.IRC.Bot.Part.Dice  (dicePart)
-import Network.IRC.Bot.Part.Hello (helloPart)
+--import Network.IRC.Bot.Part.Hello (helloPart)
 import Network.IRC.Bot.Part.Ping  (pingPart)
 import Network.IRC.Bot.Part.NickUser (nickUserPart)
 import Network.IRC.Bot.Part.Channels (initChannelsPart)
@@ -35,6 +34,8 @@ import System.Cmd                 (system)
 import System.Locale              (defaultTimeLocale)
 --import System.IO                  (stdout)
 import Data.Maybe                 (fromJust)
+import TimerBot                       (BotConf(..), User(..), nullBotConf, simpleBot, timerBot)
+import HttpGet                    (httpGet)
 
 data Flag
     = BotConfOpt { unBotConfOpt :: (BotConf -> BotConf) }
@@ -157,7 +158,7 @@ initParts chans =
             , nickUserPart
             , channelsPart
             , dicePart
-            , helloPart
+--            , helloPart
 --            , logPart . head . toList $ chans
             ]
 
