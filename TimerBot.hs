@@ -229,7 +229,7 @@ writeMaybeChan (Just chan) a = writeChan chan a
 
 timerBot :: BotConf          -- ^ Bot configuration
           -> [BotPartT IO ()] -- ^ bot parts (must include 'pingPart', or equivalent)
-          -> [BotPartT IO ()] -- ^ feed bot parts
+          -> [(BotPartT IO (), Int)] -- ^ feed bot parts
           -> IO ([ThreadId], IO ())    -- ^ 'ThreadId' for all forked handler threads and a function that forces a reconnect
 timerBot BotConf{..} parts timerParts =
     timerBot' channelLogger logger limits host port nick commandPrefix user parts timerParts
@@ -248,7 +248,7 @@ timerBot' :: (Maybe (Chan Message -> IO ())) -- ^ optional logging function
           -> String           -- ^ command prefix
           -> User             -- ^ irc user info
           -> [BotPartT IO ()] -- ^ bot parts (must include 'pingPart', 'channelsPart', and 'nickUserPart)'
-          -> [BotPartT IO ()] -- ^ feed bot parts
+          -> [(BotPartT IO (), Int)] -- ^ feed bot parts
           -> IO ([ThreadId], IO ())    -- ^ 'ThreadId' for all forked handler threads and an IO action that forces a reconnect
 timerBot' mChanLogger logger limitConf host port nick prefix user parts timerParts =
   do (mLogTid, mLogChan) <-
@@ -272,7 +272,7 @@ timerBot' mChanLogger logger limitConf host port nick prefix user parts timerPar
                        when (now > addUTCTime (fromIntegral timeout) lastActivity) forceReconnect
                        threadDelay (30*10^6) -- check every 30 seconds
      ircTids     <- ircLoop logger nick prefix incomingChan outgoingChan parts
-     timerTids    <- timerLoop logger nick prefix incomingChan outgoingChan timerParts
+     timerTids   <- timerLoop logger nick prefix incomingChan outgoingChan timerParts
      onConnectId <- onConnectLoop logger nick prefix outgoingChan connQSem onConnect
      return $ (maybe id (:) mLimitTid $ maybe id (:) mLogTid $ (incomingTid : outgoingTid : watchDogTid : ircTids ++ timerTids), forceReconnect)
     where
@@ -280,15 +280,16 @@ timerBot' mChanLogger logger limitConf host port nick prefix user parts timerPar
       onConnect =
           changeNickUser nick (Just user)
 
-timerPartLoop :: Logger -> String -> String -> Chan Message -> Chan Message -> (BotPartT IO ()) -> IO ()
-timerPartLoop logger botName prefix incomingChan outgoingChan botPart =
+timerPartLoop :: Logger -> String -> String -> Chan Message -> Chan Message -> (BotPartT IO ()) -> Int -> IO ()
+timerPartLoop logger botName prefix incomingChan outgoingChan botPart wait=
   forever $ do let msg = Message Nothing "" []
                runBotPartT botPart $ BotEnv msg outgoingChan logger botName prefix
+               threadDelay wait
 
-timerLoop :: Logger -> String -> String -> Chan Message -> Chan Message -> [BotPartT IO ()] -> IO [ThreadId]
+timerLoop :: Logger -> String -> String -> Chan Message -> Chan Message -> [(BotPartT IO (), Int)] -> IO [ThreadId]
 timerLoop logger botName prefix incomingChan outgoingChan parts =
     mapM forkPart parts
   where
-    forkPart botPart =
+    forkPart (botPart, wait) =
       do inChan <- dupChan incomingChan
-         forkIO $ partLoop logger botName prefix inChan outgoingChan (botPart `mplus` return ())
+         forkIO $ timerPartLoop logger botName prefix inChan outgoingChan (botPart `mplus` return ()) wait

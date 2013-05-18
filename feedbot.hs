@@ -133,7 +133,7 @@ main =
      (url, channel, span) <- getFeedConf
      ircParts <- initParts (channels botConf)
      let file = "tmpfile"
-     let feedParts = [feedPart file url channel (span * 1000 * 1000)]
+     let feedParts = [(feedPart file url channel, span * 1000 * 1000)]
      (tids, _) <- timerBot botConf ircParts feedParts
      (logger botConf) Important  "Press enter to quit."
      getLine
@@ -193,8 +193,8 @@ getLocalCurrentTimeString format =
      let formatted = formatTime defaultTimeLocale format local
      return formatted
 
-feedPart :: BotMonad m => String -> String -> String -> Int -> m ()
-feedPart file url channel wait =
+feedPart :: BotMonad m => String -> String -> String -> m ()
+feedPart file url channel =
   do (_, _, body) <- liftIO $ httpGet url
      last <- liftIO $ lastUpdated file
      let news = getUpdatedItems last body
@@ -209,9 +209,9 @@ feedPart file url channel wait =
                    msg = title ++ "(" ++ author ++ ") " ++ link
                sendMessage $ privmsg channel msg
                return ()
-              ) $ reverse news
+              ) $ take 10 (reverse news)
      liftIO $ saveUpdated file news
-     liftIO $ threadDelay wait
+     liftIO $ putStrLn "hoge"
      return ()
 
 
