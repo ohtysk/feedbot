@@ -1,4 +1,4 @@
-feedbot
+feedbot (under construction)
 =======
 
 Feed IRC bot by Haskell
@@ -9,6 +9,7 @@ Requirement
  * cabal-install 1.16.0.2
  * irc 0.5.1.0
  * ircbot 0.5.3
+ * HaXml 1.23.3
 
 Usage
 ----
