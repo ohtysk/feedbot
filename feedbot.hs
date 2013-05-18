@@ -34,8 +34,10 @@ import System.Cmd                 (system)
 import System.Locale              (defaultTimeLocale)
 --import System.IO                  (stdout)
 import Data.Maybe                 (fromJust)
-import TimerBot                       (BotConf(..), User(..), nullBotConf, simpleBot, timerBot)
+import TimerBot                   (BotConf(..), User(..), nullBotConf, simpleBot, timerBot)
 import HttpGet                    (httpGet)
+import Text.Feed.Query            (getItemTitle, getItemAuthor)
+import FeedItems                  (getUpdatedItems, saveUpdated, lastUpdated, getItemDateString, getUrlFromItem)
 
 data Flag
     = BotConfOpt { unBotConfOpt :: (BotConf -> BotConf) }
@@ -137,7 +139,8 @@ main =
   do botConf <- getBotConf Nothing
      (url, channel, span) <- getFeedConf
      ircParts <- initParts (channels botConf)
-     let feedParts = [feedPart url channel (span * 1000 * 1000)]
+     let file = "tmpfile"
+     let feedParts = [feedPart file url channel (span * 1000 * 1000)]
      (tids, _) <- timerBot botConf ircParts feedParts
 --     (tids, reconnect) <- simpleBot botConf ircParts
 --     (logger botConf) Important  "Press enter to force reconnect."
@@ -209,11 +212,34 @@ getLocalCurrentTimeString format =
      return formatted
 
 
-feedPart :: BotMonad m => String -> String -> Int -> m ()
-feedPart url channel wait =
-  do time <- liftIO $ getLocalCurrentTimeString "%F %X feed "
-     let msg = time ++ url
-     liftIO $ putStrLn $ msg
-     sendMessage $ privmsg channel msg
+-- feedPart :: BotMonad m => String -> String -> Int -> m ()
+-- feedPart url channel wait =
+--   do time <- liftIO $ getLocalCurrentTimeString "%F %X feed "
+--      let msg = time ++ url
+--      liftIO $ putStrLn $ msg
+--      sendMessage $ privmsg channel msg
+--      liftIO $ threadDelay wait
+--      return ()
+
+feedPart :: BotMonad m => String -> String -> String -> Int -> m ()
+feedPart file url channel wait =
+  do (_, _, body) <- liftIO $ httpGet url
+     last <- liftIO $ lastUpdated file
+     let news = getUpdatedItems last body
+     mapM (\item ->
+            do let link = getUrlFromItem item
+                   title = case getItemTitle item of
+                     Just t -> t
+                     _ -> ""                       
+                   author = case getItemAuthor item of
+                     Just a -> a
+                     _ -> ""
+                   msg = title ++ "(" ++ author ++ ") " ++ link
+               sendMessage $ privmsg channel msg
+               return ()
+              ) news
+     liftIO $ saveUpdated file news
      liftIO $ threadDelay wait
      return ()
+
+
