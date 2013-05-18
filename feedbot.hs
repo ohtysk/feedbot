@@ -1,9 +1,7 @@
-
 --ircbot.hs
 
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, GeneralizedNewtypeDeriving, RankNTypes, RecordWildCards #-}
 module Main where
-
 
 import Data.Time.Format           (formatTime)
 import Data.Time.LocalTime        (utcToLocalTime, getTimeZone)
@@ -15,24 +13,20 @@ import Control.Concurrent.STM.TVar(TVar, newTVar, readTVar, writeTVar)
 import Control.Monad              (liftM, forever)
 import Control.Monad.IO.Class     (liftIO)
 import Data.Set                   (Set, insert, toList)
---import Network                    (HostName, PortID(PortNumber), connectTo)
 import Network                    (PortID(..))
 import Network.IRC                (Message)
 import Network.IRC.Commands       (privmsg)
 import Network.IRC.Bot.BotMonad   (BotMonad(..))
---import Network.IRC.Bot.Core       (BotConf(..), User(..), nullBotConf, simpleBot)
 import Network.IRC.Bot.Log        (LogLevel(..), nullLogger, stdoutLogger)
 import Network.IRC.Bot.Part.Dice  (dicePart)
---import Network.IRC.Bot.Part.Hello (helloPart)
 import Network.IRC.Bot.Part.Ping  (pingPart)
 import Network.IRC.Bot.Part.NickUser (nickUserPart)
 import Network.IRC.Bot.Part.Channels (initChannelsPart)
-import System.Console.GetOpt
+import System.Console.GetOpt      (OptDescr(..), ArgDescr(..), getOpt, ArgOrder(..), usageInfo)
 import System.Environment         (getArgs, getProgName)
 import System.Exit                (exitFailure)
 import System.Cmd                 (system)
 import System.Locale              (defaultTimeLocale)
---import System.IO                  (stdout)
 import Data.Maybe                 (fromJust)
 import TimerBot                   (BotConf(..), User(..), nullBotConf, simpleBot, timerBot)
 import HttpGet                    (httpGet)
@@ -59,7 +53,6 @@ botOpts =
   ]
   where
     setIrcServer n = BotConfOpt $ \c -> c { host = n, user = (user c) { servername = n } }
---    setPort str    = BotConfOpt $ \c -> c { port = PortNumber (fromIntegral $ read str) }
     setPort str    = BotConfOpt $ \c -> c { port = PortNumber (fromIntegral $ ((read str) :: Integer)) }
     setNick n      = BotConfOpt $ \c -> c { nick = n }
     setUsername n  = BotConfOpt $ \c -> c { user = (user c) { username = n } }
@@ -142,13 +135,8 @@ main =
      let file = "tmpfile"
      let feedParts = [feedPart file url channel (span * 1000 * 1000)]
      (tids, _) <- timerBot botConf ircParts feedParts
---     (tids, reconnect) <- simpleBot botConf ircParts
---     (logger botConf) Important  "Press enter to force reconnect."
---     getLine
---     reconnect
      (logger botConf) Important  "Press enter to quit."
      getLine
-
      mapM_ killThread tids
 
 
@@ -161,8 +149,6 @@ initParts chans =
             , nickUserPart
             , channelsPart
             , dicePart
---            , helloPart
---            , logPart . head . toList $ chans
             ]
 
 showBotConf :: BotConf -> String
@@ -184,23 +170,19 @@ showPort conf =
 logPart :: BotMonad m => String -> m ()
 logPart channel =
   do msg <- liftM show askMessage
---     logM Debug $ "logPart: " ++ msg
      time <- liftIO $ getLocalCurrentTimeString "%F %X"
      let cmd = "echo '" ++ time ++ " "  ++ msg ++ "' >> log"
      logM Debug cmd
      liftIO $ system cmd
      sendMessage $ privmsg channel cmd
-     
      return ()
 
 logPart' :: BotMonad m => m ()
 logPart' =
   do msg <- liftM show askMessage
---     logM Debug $ "logPart: " ++ msg
      time <- liftIO $ getLocalCurrentTimeString "%F %X"
      let cmd = "echo log2 '" ++ time ++ " "  ++ msg ++ "' >> log"
      logM Debug cmd
---     liftIO $ system cmd
      return ()
 
 getLocalCurrentTimeString :: String -> IO String
@@ -210,16 +192,6 @@ getLocalCurrentTimeString format =
      let local = utcToLocalTime zone utc
      let formatted = formatTime defaultTimeLocale format local
      return formatted
-
-
--- feedPart :: BotMonad m => String -> String -> Int -> m ()
--- feedPart url channel wait =
---   do time <- liftIO $ getLocalCurrentTimeString "%F %X feed "
---      let msg = time ++ url
---      liftIO $ putStrLn $ msg
---      sendMessage $ privmsg channel msg
---      liftIO $ threadDelay wait
---      return ()
 
 feedPart :: BotMonad m => String -> String -> String -> Int -> m ()
 feedPart file url channel wait =
@@ -237,7 +209,7 @@ feedPart file url channel wait =
                    msg = title ++ "(" ++ author ++ ") " ++ link
                sendMessage $ privmsg channel msg
                return ()
-              ) news
+              ) $ reverse news
      liftIO $ saveUpdated file news
      liftIO $ threadDelay wait
      return ()
